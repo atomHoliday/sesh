@@ -14,13 +14,9 @@ cp "$SCRIPT_DIR/daemon/sesh-daemon.py" "$DEST_BIN/sesh-daemon"
 chmod +x "$DEST_BIN/sesh-daemon"
 
 echo "==> Installing Python dependencies..."
-# NOTE: The daemon imports `dbus` (dbus-python), NOT `dasbus`.
-# requirements.txt lists: cryptography, PyGObject, dbus-python
-# If pip install fails, manually run:
-#   pip3 install cryptography PyGObject dbus-python
-pip3 install cryptography dasbus --quiet 2>/dev/null || \
-  python3 -m pip install cryptography dasbus --quiet 2>/dev/null || \
-  echo "WARNING: could not install deps, run: pip3 install cryptography PyGObject dbus-python"
+pip3 install -r "$SCRIPT_DIR/daemon/requirements.txt" --quiet --break-system-packages 2>/dev/null || \
+  pip3 install -r "$SCRIPT_DIR/daemon/requirements.txt" --quiet 2>/dev/null || \
+  echo "WARNING: could not install deps, run: pip3 install -r daemon/requirements.txt"
 
 echo "==> Installing systemd user service..."
 mkdir -p "$DEST_SERVICE"
@@ -48,13 +44,15 @@ if ! echo "$CURRENT_EXTENSIONS" | grep -q "sesh@sesh.local"; then
   gsettings set org.gnome.shell enabled-extensions "$NEW_EXTENSIONS" || true
 fi
 
+echo "==> Starting daemon..."
+systemctl --user start sesh.service 2>/dev/null || true
+systemctl --user enable sesh.service 2>/dev/null || true
+
 echo ""
 echo "  Sesh installed!"
 echo ""
-echo "  Start the daemon:"
-echo "    systemctl --user start sesh.service"
-echo ""
-echo "  Reload the extension (ALT+F2, type 'r', Enter)"
+echo "  Reload GNOME Shell: Alt+F2, type 'r', Enter"
 echo "  The 'S' icon will appear in your top bar."
 echo ""
 echo "  To view logs: journalctl --user -u sesh.service -f"
+echo "  To stop:      systemctl --user stop sesh.service"
