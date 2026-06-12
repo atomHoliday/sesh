@@ -31,41 +31,24 @@ export class SeshPanelButton extends PanelMenu.Button {
       if (isOpen) this._onMenuOpen();
     });
 
-    // GNOME 50: PanelMenu.Button default click handling is broken.
-    // Disable the built-in click gesture and handle clicks manually.
-    // If the menu stops opening, check if _clickGesture still exists
-    // or if GNOME changed the click handling mechanism.
-    if (this._clickGesture)
-      this._clickGesture.set_enabled(false);
-
-    // FIX (2026-06-11): vfunc_button_press_event was not firing on click
-    // despite being defined. Neither _clickGesture disable nor the
-    // vfunc override worked — clicking the panel icon did nothing.
-    // The fix is connecting to St.Button's `clicked` signal directly,
-    // which is the standard signal for St.Button (the base class of
-    // PanelMenu.Button). This works across GNOME versions because
-    // `clicked` is part of the St.Button public API, unlike
-    // _clickGesture (private) and vfunc_button_press_event (Clutter
-    // event routing, which GNOME can change without notice).
-    // If clicks break again, check:
-    //   1. Is `clicked` signal still emitted by St.Button?
-    //   2. Has PanelMenu.Button stopped extending St.Button?
-    //   3. Does this.menu still exist at signal-connection time?
-    this.connect('clicked', () => this.menu.toggle());
-  }
-
-  // Manual click handler — kept as fallback. Was not firing on GNOME 50
-  // despite being correctly defined. The `clicked` signal above is the
-  // reliable path. If vfunc_button_press_event starts working again in
-  // a future GNOME version, it will fire *in addition to* `clicked`,
-  // which could double-toggle the menu. In that case, remove the
-  // `this.connect('clicked', ...)` line above and rely on this vfunc.
-  vfunc_button_press_event(event) {
-    if (event.get_button() === 1) {
-      this.menu.toggle();
-      return Clutter.EVENT_STOP;
-    }
-    return Clutter.EVENT_PROPAGATE;
+    // GNOME 50: PanelMenu.Button uses Clutter.ClickGesture internally
+    // (created in PanelMenu.Button._init as this._clickGesture). The
+    // gesture automatically toggles this.menu on click — no manual
+    // click handling is needed. The default behavior works correctly.
+    //
+    // PAST ISSUES (kept for reference):
+    // - Disabling _clickGesture broke menu toggle.
+    // - this.connect('clicked', ...) failed because PanelMenu.Button
+    //   extends ButtonBox → St.Widget, NOT St.Button. There is no
+    //   `clicked` signal on St.Widget.
+    // - vfunc_button_press_event did not fire on GNOME 50 because
+    //   Clutter.ClickGesture (an Action) intercepts the event before
+    //   it reaches the vfunc.
+    //
+    // If clicks break in a future GNOME version, check:
+    //   1. Does PanelMenu.Button still create _clickGesture?
+    //   2. Does the gesture still call this.menu?.toggle()?
+    //   3. Has the PanelMenu.Button class hierarchy changed?
   }
 
   async _onMenuOpen() {

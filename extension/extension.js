@@ -15,20 +15,30 @@ import { SeshPanelButton } from './panelMenu.js';
 //      needs `static { GObject.registerClass(this); }` in the class body.
 //
 // 2. Extension icon appears but menu doesn't open on click
-//    → Check panelMenu.js: vfunc_button_press_event must exist.
-//    → Check that _clickGesture is disabled in _init.
-//    → GNOME versions may change how PanelMenu.Button handles clicks.
-//    → FIX (2026-06-11): Neither _clickGesture disable nor
-//      vfunc_button_press_event fired on GNOME 50. The fix was
-//      connecting to the `clicked` signal on `this` (St.Button API),
-//      which is the reliable click path across GNOME versions.
-//      See panelMenu.js _init() for the fix and full notes.
+//    → PanelMenu.Button handles clicks via Clutter.ClickGesture in
+//      GNOME 50+. The gesture is created in PanelMenu.Button._init
+//      and calls this.menu?.toggle() automatically.
+//    → Do NOT disable this._clickGesture — it breaks the menu.
+//    → Do NOT connect to 'clicked' — PanelMenu.Button extends
+//      St.Widget, which has no 'clicked' signal (only St.Button).
+//    → Do NOT override vfunc_button_press_event — Clutter.ClickGesture
+//      intercepts the event before it reaches the vfunc.
+//    → If clicks break, check PanelMenu.js source for changes to
+//      _clickGesture or the Button class hierarchy.
 //
 // 3. "Daemon unreachable" shown in menu
 //    → The D-Bus daemon (com.sesh.Daemon) is not running.
 //    → Start it: systemctl --user start sesh.service
 //    → Check logs: journalctl --user -u sesh.service -f
 //    → Verify D-Bus name: busctl --user list | grep sesh
+//
+// 3b. Extension fails to load with "sesh enable error" in journal
+//    → Check: journalctl --user -b | grep "sesh enable error"
+//    → Common cause: multiple daemons claiming com.sesh.Daemon.
+//      Ensure only one of sesh.service (Python) or sesh-daemon.service
+//      (Node.js) is enabled. Check: systemctl --user list-unit-files | grep sesh
+//    → If sesh-daemon.service (Node.js) is enabled alongside sesh.service,
+//      disable it: systemctl --user disable sesh-daemon.service
 //
 // 4. Peers never appear online
 //    → Daemon must be running on both machines.
