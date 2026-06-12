@@ -1,0 +1,50 @@
+.sesh-header {
+  padding: 8px 12px;
+  background-color: rgba(128, 128, 128, 0.1);
+  spacing: 8px;
+}
+
+.sesh-back-btn {
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.sesh-title {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.sesh-messages {
+  max-height: 300px;
+  min-height: 150px;
+  padding: 4px 0;
+}
+
+.sesh-message-box {
+  spacing: 4px;
+  padding: 4px 12px;
+}
+
+.sesh-msg-own {
+  color: #3584e4;
+  padding: 2px 0;
+}
+
+.sesh-msg-other {
+  color: #33d17a;
+  padding: 2px 0;
+}
+
+.sesh-input-box {
+  padding: 8px 12px;
+  spacing: 8px;
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+.sesh-input {
+  flex-grow: 1;
+}
+
+.sesh-send-btn {
+  min-width: 60px;
+}

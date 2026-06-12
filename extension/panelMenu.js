@@ -26,76 +26,21 @@ export class SeshPanelButton extends PanelMenu.Button {
     });
     this.add_child(label);
 
-    // GNOME 50 FIX: PopupMenu.open() has an isEmpty() guard that returns
-    // early if the menu has no visible children. We only populate items in
-    // _onMenuOpen() (via open-state-changed), creating a chicken-and-egg
-    // problem: menu can never open because it's empty, and items are only
-    // added when it opens. Pre-populate with a placeholder so isEmpty()
-    // returns false on the first click. _onMenuOpen() clears everything
-    // and rebuilds on open.
-    //
-    // IMPORTANT: The placeholder must remain VISIBLE. GNOME 50's isEmpty()
-    // checks child.visible to count children — setting it invisible makes
-    // isEmpty() ignore it, defeating the fix. The placeholder is
-    // non-reactive so it won't interfere with clicks, and _onMenuOpen()
-    // immediately clears and rebuilds the menu on open.
-    const placeholder = new PopupMenu.PopupMenuItem(' ', {
-      reactive: false,
-      can_focus: false,
-    });
-    this.menu.addMenuItem(placeholder);
+    this._addPlaceholder();
 
     this.menu.connect('open-state-changed', (_menu, isOpen) => {
       if (isOpen) this._onMenuOpen();
     });
-
-    // ═══════════════════════════════════════════════════════════════
-    // TROUBLESHOOTING NOTES — GNOME 50 PanelMenu click handling
-    // ═══════════════════════════════════════════════════════════════
-    //
-    // How it works:
-    //   PanelMenu.Button._init creates a Clutter.ClickGesture and
-    //   adds it as an action via add_action(). The gesture has
-    //   set_recognize_on_press(true) and connects 'recognize' to
-    //   this.menu?.toggle(). That's the ENTIRE click mechanism.
-    //
-    // If the menu doesn't open on click, check these in order:
-    //
-    //   1. isEmpty() guard: Does the menu have VISIBLE children?
-    //      → open() returns early if isEmpty() is true. GNOME 50's
-    //        isEmpty() checks child.visible — a hidden placeholder
-    //        doesn't count. We add a visible placeholder item (non-
-    //        reactive) in _init(). Do NOT set it invisible.
-    //
-    //   2. _clickGesture exists and is enabled?
-    //      → this._clickGesture?.get_enabled?.() should be true.
-    //      → Do NOT disable it — it breaks the menu.
-    //
-    //   3. Does this.menu exist?
-    //      → setMenu() must have been called (it is, via super._init).
-    //
-    //   4. PanelMenu.js source changes?
-    //      → Check /usr/share/gnome-shell/js/ui/panelMenu.js
-    //        (may be in gresource bundle) for changes to the Button
-    //        class, _clickGesture setup, or toggle() call.
-    //
-    //   5. Conflicting signal handlers?
-    //      → If another extension or code connects to _clickGesture
-    //        'recognize' and returns EVENT_STOP, it could block the
-    //        default handler. Check with:
-    //          journalctl --user -b | grep "sesh"
-    //
-    //   6. PopupMenu.toggle() or open() overridden?
-    //      → Check popupMenu.js for changes to open() or toggle().
-    //
-    // To add debug logging back, uncomment these lines:
-    //   log('sesh DEBUG: _clickGesture.recognize fired!');
-    //   log(`sesh DEBUG: open-state-changed isOpen=${isOpen}`);
-    // ═══════════════════════════════════════════════════════════════
   }
 
   async _onMenuOpen() {
     this._clearMenu();
+    // Re-add visible placeholder after every clear so isEmpty() never
+    // returns true. _renderMainMenu/_renderChatView add real items below,
+    // and the placeholder is non-reactive so it doesn't interfere.
+    // This also guards against the race where _renderMainMenu's async
+    // D-Bus call yields while the menu is empty.
+    this._addPlaceholder();
     try {
       if (this._chatPeerId) {
         this._renderChatView();
@@ -110,6 +55,17 @@ export class SeshPanelButton extends PanelMenu.Button {
   _clearMenu() {
     this.menu.removeAll();
     this._menuItems = [];
+  }
+
+  // Adds a visible, non-reactive placeholder so GNOME 50's isEmpty()
+  // guard never blocks open(). Must be visible — isEmpty() checks
+  // child.visible. Must be non-reactive so clicks pass through.
+  _addPlaceholder() {
+    const placeholder = new PopupMenu.PopupMenuItem(' ', {
+      reactive: false,
+      can_focus: false,
+    });
+    this.menu.addMenuItem(placeholder);
   }
 
   async _renderMainMenu() {

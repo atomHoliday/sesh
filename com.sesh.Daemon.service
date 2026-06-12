@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=com.sesh.Daemon
+Exec=%h/.local/bin/sesh-daemon
+SystemdService=sesh.service

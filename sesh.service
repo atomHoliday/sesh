@@ -1,0 +1,13 @@
+[Unit]
+Description=Sesh P2P E2EE chat daemon
+After=network.target dbus.service
+Wants=dbus.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/sesh-daemon
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
