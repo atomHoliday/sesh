@@ -18,13 +18,17 @@ import { SeshPanelButton } from './panelMenu.js';
 //    → PanelMenu.Button handles clicks via Clutter.ClickGesture in
 //      GNOME 50+. The gesture is created in PanelMenu.Button._init
 //      and calls this.menu?.toggle() automatically.
+//    → PopupMenu.open() has an isEmpty() guard — returns early if menu
+//      has no children. We add a hidden placeholder in _init() so the
+//      menu is never empty on first open. _onMenuOpen() clears and
+//      rebuilds on open-state-changed.
 //    → Do NOT disable this._clickGesture — it breaks the menu.
 //    → Do NOT connect to 'clicked' — PanelMenu.Button extends
 //      St.Widget, which has no 'clicked' signal (only St.Button).
 //    → Do NOT override vfunc_button_press_event — Clutter.ClickGesture
 //      intercepts the event before it reaches the vfunc.
-//    → If clicks break, check PanelMenu.js source for changes to
-//      _clickGesture or the Button class hierarchy.
+//    → If clicks still break, check panelMenu.js TROUBLESHOOTING NOTES
+//      for a numbered list of what to inspect.
 //
 // 3. "Daemon unreachable" shown in menu
 //    → The D-Bus daemon (com.sesh.Daemon) is not running.

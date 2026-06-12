@@ -13,17 +13,11 @@ export class SeshPanelButton extends PanelMenu.Button {
 
   _init(dbusClient) {
     super._init(0.0, 'Sesh', false);
-    log('sesh DEBUG: _init called, super._init completed');
-
     this._dbus = dbusClient;
     this._conversations = {};
     this._chatPeerId = null;
     this._chatUsername = null;
     this._menuItems = [];
-
-    log(`sesh DEBUG: this.menu = ${this.menu}`);
-    log(`sesh DEBUG: this._clickGesture = ${this._clickGesture}`);
-    log(`sesh DEBUG: this._clickGesture enabled = ${this._clickGesture?.get_enabled?.() ?? 'N/A'}`);
 
     const label = new St.Label({
       text: 'S',
@@ -32,57 +26,73 @@ export class SeshPanelButton extends PanelMenu.Button {
     });
     this.add_child(label);
 
-    this.menu.connect('open-state-changed', (menu, isOpen) => {
-      log(`sesh DEBUG: open-state-changed fired, isOpen=${isOpen}`);
+    // GNOME 50 FIX: PopupMenu.open() has an isEmpty() guard that returns
+    // early if the menu has no children. We only populate items in
+    // _onMenuOpen() (via open-state-changed), creating a chicken-and-egg
+    // problem: menu can never open because it's empty, and items are only
+    // added when it opens. Pre-populate with a hidden placeholder so
+    // isEmpty() returns false on the first click. _onMenuOpen() clears
+    // everything and rebuilds on open.
+    const placeholder = new PopupMenu.PopupMenuItem(' ', {
+      reactive: false,
+      can_focus: false,
+    });
+    placeholder.actor.visible = false;
+    this.menu.addMenuItem(placeholder);
+
+    this.menu.connect('open-state-changed', (_menu, isOpen) => {
       if (isOpen) this._onMenuOpen();
     });
 
-    if (this._clickGesture) {
-      this._clickGesture.connect('recognize', () => {
-        log('sesh DEBUG: _clickGesture.recognize fired!');
-      });
-      log('sesh DEBUG: connected to _clickGesture.recognize signal');
-    } else {
-      log('sesh DEBUG: WARNING - this._clickGesture is null/undefined!');
-    }
-
-    this.connect('button-press-event', () => {
-      log('sesh DEBUG: button-press-event on SeshPanelButton');
-      return Clutter.EVENT_PROPAGATE;
-    });
-    log('sesh DEBUG: connected to button-press-event');
-
-    log('sesh DEBUG: _init completed');
-
-    // GNOME 50: PanelMenu.Button uses Clutter.ClickGesture internally
-    // (created in PanelMenu.Button._init as this._clickGesture). The
-    // gesture automatically toggles this.menu on click — no manual
-    // click handling is needed. The default behavior works correctly.
+    // ═══════════════════════════════════════════════════════════════
+    // TROUBLESHOOTING NOTES — GNOME 50 PanelMenu click handling
+    // ═══════════════════════════════════════════════════════════════
     //
-    // PAST ISSUES (kept for reference):
-    // - Disabling _clickGesture broke menu toggle.
-    // - this.connect('clicked', ...) failed because PanelMenu.Button
-    //   extends ButtonBox → St.Widget, NOT St.Button. There is no
-    //   `clicked` signal on St.Widget.
-    // - vfunc_button_press_event did not fire on GNOME 50 because
-    //   Clutter.ClickGesture (an Action) intercepts the event before
-    //   it reaches the vfunc.
+    // How it works:
+    //   PanelMenu.Button._init creates a Clutter.ClickGesture and
+    //   adds it as an action via add_action(). The gesture has
+    //   set_recognize_on_press(true) and connects 'recognize' to
+    //   this.menu?.toggle(). That's the ENTIRE click mechanism.
     //
-    // If clicks break in a future GNOME version, check:
-    //   1. Does PanelMenu.Button still create _clickGesture?
-    //   2. Does the gesture still call this.menu?.toggle()?
-    //   3. Has the PanelMenu.Button class hierarchy changed?
+    // If the menu doesn't open on click, check these in order:
+    //
+    //   1. isEmpty() guard: Does the menu have visible children?
+    //      → open() returns early if isEmpty() is true. We fix this
+    //        with a hidden placeholder item in _init().
+    //
+    //   2. _clickGesture exists and is enabled?
+    //      → this._clickGesture?.get_enabled?.() should be true.
+    //      → Do NOT disable it — it breaks the menu.
+    //
+    //   3. Does this.menu exist?
+    //      → setMenu() must have been called (it is, via super._init).
+    //
+    //   4. PanelMenu.js source changes?
+    //      → Check /usr/share/gnome-shell/js/ui/panelMenu.js
+    //        (may be in gresource bundle) for changes to the Button
+    //        class, _clickGesture setup, or toggle() call.
+    //
+    //   5. Conflicting signal handlers?
+    //      → If another extension or code connects to _clickGesture
+    //        'recognize' and returns EVENT_STOP, it could block the
+    //        default handler. Check with:
+    //          journalctl --user -b | grep "sesh"
+    //
+    //   6. PopupMenu.toggle() or open() overridden?
+    //      → Check popupMenu.js for changes to open() or toggle().
+    //
+    // To add debug logging back, uncomment these lines:
+    //   log('sesh DEBUG: _clickGesture.recognize fired!');
+    //   log(`sesh DEBUG: open-state-changed isOpen=${isOpen}`);
+    // ═══════════════════════════════════════════════════════════════
   }
 
   async _onMenuOpen() {
-    log('sesh DEBUG: _onMenuOpen called');
     this._clearMenu();
     try {
       if (this._chatPeerId) {
-        log('sesh DEBUG: rendering chat view');
         this._renderChatView();
       } else {
-        log('sesh DEBUG: rendering main menu');
         await this._renderMainMenu();
       }
     } catch (e) {
