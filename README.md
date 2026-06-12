@@ -2,6 +2,12 @@
 
 End-to-end encrypted peer-to-peer chat for GNOME. Lives in your top bar.
 
+## Quick Install
+
+```bash
+git clone https://github.com/atomHoliday/sesh.git && cd sesh && ./install.sh
+```
+
 ## Features
 
 - **E2EE** — Messages encrypted with X25519 + ChaCha20-Poly1305
@@ -15,7 +21,7 @@ End-to-end encrypted peer-to-peer chat for GNOME. Lives in your top bar.
 - Python 3.10+
 - `dbus-python`, `cryptography`, `PyGObject`
 
-## Install
+## Manual Install
 
 ```bash
 git clone https://github.com/atomHoliday/sesh.git
