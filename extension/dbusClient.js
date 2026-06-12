@@ -39,6 +39,10 @@ const DBusIface = `
     <signal name="MessageReceived">
       <arg type="(ssss)"/>
     </signal>
+    <signal name="PresenceChanged">
+      <arg type="s" name="status"/>
+      <arg type="s" name="status_message"/>
+    </signal>
   </interface>
 </node>`;
 
@@ -144,7 +148,12 @@ export function makeDbusClient(callbacks) {
       return callRemote(instance, 'ListConversations', []);
     },
     setPresence(status, statusMessage) {
-      return callRemote(instance, 'SetPresence', [status, statusMessage]);
+      return new Promise((resolve, reject) => {
+        instance['SetPresenceRemote'](status, statusMessage, (result, err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
     },
     getPresence() {
       return new Promise((resolve, reject) => {

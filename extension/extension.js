@@ -17,6 +17,11 @@ export default class SeshExtension extends Extension {
           if (this._panelBtn)
             this._panelBtn.onMessageReceived(peerId, username, content, msgId);
         },
+        onPresenceChanged: (_status, _statusMessage) => {
+          if (this._panelBtn && this._panelBtn.menu.isOpen && !this._panelBtn._chatPeerId) {
+            this._panelBtn._onMenuOpen();
+          }
+        },
       });
 
       this._panelBtn = new SeshPanelButton(this._dbus);

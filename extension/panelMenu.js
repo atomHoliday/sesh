@@ -107,10 +107,15 @@ export class SeshPanelButton extends PanelMenu.Button {
       style_class: 'sesh-dialog-ok-btn',
       label: 'Set',
     });
-    okBtn.connect('clicked', () => {
+    okBtn.connect('clicked', async () => {
       const text = entry.text.trim();
-      this._dbus.setPresence('custom', text);
+      try {
+        await this._dbus.setPresence('custom', text);
+      } catch (e) {
+        console.error('sesh: set presence failed', e);
+      }
       dialog.close();
+      this._onMenuOpen();
     });
 
     buttonBox.add_child(cancelBtn);
@@ -118,10 +123,15 @@ export class SeshPanelButton extends PanelMenu.Button {
     contentBox.add_child(buttonBox);
 
     dialog.contentLayout.add_child(contentBox);
-    entry.clutter_text.connect('activate', () => {
+    entry.clutter_text.connect('activate', async () => {
       const text = entry.text.trim();
-      this._dbus.setPresence('custom', text);
+      try {
+        await this._dbus.setPresence('custom', text);
+      } catch (e) {
+        console.error('sesh: set presence failed', e);
+      }
       dialog.close();
+      this._onMenuOpen();
     });
 
     dialog.open(global.get_current_time());
@@ -153,14 +163,19 @@ export class SeshPanelButton extends PanelMenu.Button {
           if (item.status === 'custom') {
             this._showCustomStatusDialog();
           } else {
-            await this._dbus.setPresence(item.status, '');
-            this._onMenuOpen();
+            try {
+              await this._dbus.setPresence(item.status, '');
+              this._onMenuOpen();
+            } catch (e) {
+              console.error('sesh: set presence failed', e);
+            }
           }
         });
         statusSection.addMenuItem(menuItem);
       }
     } catch (err) {
-      const item = new PopupMenu.PopupMenuItem('  Online');
+      console.error('sesh: get presence failed', err);
+      const item = new PopupMenu.PopupMenuItem('Daemon unreachable');
       item.actor.reactive = false;
       statusSection.addMenuItem(item);
     }
