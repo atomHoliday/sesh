@@ -13,12 +13,17 @@ export class SeshPanelButton extends PanelMenu.Button {
 
   _init(dbusClient) {
     super._init(0.0, 'Sesh', false);
+    log('sesh DEBUG: _init called, super._init completed');
 
     this._dbus = dbusClient;
     this._conversations = {};
     this._chatPeerId = null;
     this._chatUsername = null;
     this._menuItems = [];
+
+    log(`sesh DEBUG: this.menu = ${this.menu}`);
+    log(`sesh DEBUG: this._clickGesture = ${this._clickGesture}`);
+    log(`sesh DEBUG: this._clickGesture enabled = ${this._clickGesture?.get_enabled?.() ?? 'N/A'}`);
 
     const label = new St.Label({
       text: 'S',
@@ -28,8 +33,26 @@ export class SeshPanelButton extends PanelMenu.Button {
     this.add_child(label);
 
     this.menu.connect('open-state-changed', (menu, isOpen) => {
+      log(`sesh DEBUG: open-state-changed fired, isOpen=${isOpen}`);
       if (isOpen) this._onMenuOpen();
     });
+
+    if (this._clickGesture) {
+      this._clickGesture.connect('recognize', () => {
+        log('sesh DEBUG: _clickGesture.recognize fired!');
+      });
+      log('sesh DEBUG: connected to _clickGesture.recognize signal');
+    } else {
+      log('sesh DEBUG: WARNING - this._clickGesture is null/undefined!');
+    }
+
+    this.connect('button-press-event', () => {
+      log('sesh DEBUG: button-press-event on SeshPanelButton');
+      return Clutter.EVENT_PROPAGATE;
+    });
+    log('sesh DEBUG: connected to button-press-event');
+
+    log('sesh DEBUG: _init completed');
 
     // GNOME 50: PanelMenu.Button uses Clutter.ClickGesture internally
     // (created in PanelMenu.Button._init as this._clickGesture). The
@@ -52,11 +75,14 @@ export class SeshPanelButton extends PanelMenu.Button {
   }
 
   async _onMenuOpen() {
+    log('sesh DEBUG: _onMenuOpen called');
     this._clearMenu();
     try {
       if (this._chatPeerId) {
+        log('sesh DEBUG: rendering chat view');
         this._renderChatView();
       } else {
+        log('sesh DEBUG: rendering main menu');
         await this._renderMainMenu();
       }
     } catch (e) {
