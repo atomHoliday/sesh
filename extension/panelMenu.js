@@ -1,14 +1,16 @@
+import GObject from 'gi://GObject';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
-import GObject from 'gi://GObject';
 import GLib from 'gi://GLib';
 
-export var SeshPanelButton = GObject.registerClass({
-  GTypeName: 'SeshPanelButton',
-}, class SeshPanelButton extends PanelMenu.Button {
+export class SeshPanelButton extends PanelMenu.Button {
+  static {
+    GObject.registerClass(this);
+  }
+
   _init(dbusClient) {
     super._init(0.0, 'Sesh', false);
 
@@ -29,10 +31,35 @@ export var SeshPanelButton = GObject.registerClass({
       if (isOpen) this._onMenuOpen();
     });
 
+    // GNOME 50: PanelMenu.Button default click handling is broken.
+    // Disable the built-in click gesture and handle clicks manually.
+    // If the menu stops opening, check if _clickGesture still exists
+    // or if GNOME changed the click handling mechanism.
     if (this._clickGesture)
       this._clickGesture.set_enabled(false);
+
+    // FIX (2026-06-11): vfunc_button_press_event was not firing on click
+    // despite being defined. Neither _clickGesture disable nor the
+    // vfunc override worked — clicking the panel icon did nothing.
+    // The fix is connecting to St.Button's `clicked` signal directly,
+    // which is the standard signal for St.Button (the base class of
+    // PanelMenu.Button). This works across GNOME versions because
+    // `clicked` is part of the St.Button public API, unlike
+    // _clickGesture (private) and vfunc_button_press_event (Clutter
+    // event routing, which GNOME can change without notice).
+    // If clicks break again, check:
+    //   1. Is `clicked` signal still emitted by St.Button?
+    //   2. Has PanelMenu.Button stopped extending St.Button?
+    //   3. Does this.menu still exist at signal-connection time?
+    this.connect('clicked', () => this.menu.toggle());
   }
 
+  // Manual click handler — kept as fallback. Was not firing on GNOME 50
+  // despite being correctly defined. The `clicked` signal above is the
+  // reliable path. If vfunc_button_press_event starts working again in
+  // a future GNOME version, it will fire *in addition to* `clicked`,
+  // which could double-toggle the menu. In that case, remove the
+  // `this.connect('clicked', ...)` line above and rely on this vfunc.
   vfunc_button_press_event(event) {
     if (event.get_button() === 1) {
       this.menu.toggle();
@@ -132,7 +159,7 @@ export var SeshPanelButton = GObject.registerClass({
       reactive: true,
     });
     const messageBox = new St.BoxLayout({ orientation: Clutter.Orientation.VERTICAL, style_class: 'sesh-message-box' });
-    scrollView.add_actor(messageBox);
+    scrollView.add_child(messageBox);
     view.actor.add_child(scrollView);
 
     const inputBox = new St.BoxLayout({ style_class: 'sesh-input-box' });
@@ -194,7 +221,7 @@ export var SeshPanelButton = GObject.registerClass({
       style_class: isOwn ? 'sesh-msg-own' : 'sesh-msg-other',
     });
     messageBox.add_child(msg);
-    scrollView.vscroll.adjustment.value = scrollView.vscroll.adjustment.upper;
+    scrollView.vadjustment.value = scrollView.vadjustment.upper;
   }
 
   _openChat(peerId, username) {
@@ -210,7 +237,10 @@ export var SeshPanelButton = GObject.registerClass({
     });
   }
 
-  onPeerOnline() {
+  // Called from extension.js when a peer comes online.
+  // Parameters: peerId, username (passed from D-Bus signal PeerOnline).
+  // If menu is open on the main list, refresh to show the new peer.
+  onPeerOnline(_peerId, _username) {
     if (this.menu.isOpen && !this._chatPeerId) {
       this._onMenuOpen();
     }
@@ -244,4 +274,4 @@ export var SeshPanelButton = GObject.registerClass({
 
     Main.notify(`Sesh: ${username}`, content);
   }
-});
+}
