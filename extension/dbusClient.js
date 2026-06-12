@@ -147,7 +147,12 @@ export function makeDbusClient(callbacks) {
       return callRemote(instance, 'SetPresence', [status, statusMessage]);
     },
     getPresence() {
-      return callRemote(instance, 'GetPresence', []);
+      return new Promise((resolve, reject) => {
+        instance['GetPresenceRemote']((result, err) => {
+          if (err) reject(err);
+          else resolve(result);
+        });
+      });
     },
     destroy,
   };

@@ -17,6 +17,8 @@ import dbus.service
 import dbus.mainloop.glib
 from gi.repository import GLib
 
+import re
+
 from config import Config
 from crypto import SeshCrypto
 from db import MessageStore
@@ -94,6 +96,7 @@ class DbusApi(dbus.service.Object):
 class SeshDaemon:
     def __init__(self, config: Config):
         self._config = config
+        self._config_path = Path.home() / ".config" / "sesh" / "config.toml"
         self._crypto = SeshCrypto.load_or_generate(config.crypto["key_dir"])
         self._store = MessageStore(config.db["path"])
 
@@ -268,10 +271,30 @@ class SeshDaemon:
             status = "online"
         self._discovery._my.status = status
         self._discovery._my.status_message = status_message
+        self._persist_status(status, status_message)
         self._discovery.broadcast_presence()
         if self._dbus_api:
             self._dbus_api.PresenceChanged(status, status_message)
         log.info("presence set to: %s (%s)", status, status_message)
+
+    def _persist_status(self, status: str, status_message: str):
+        try:
+            text = self._config_path.read_text()
+            text = re.sub(
+                r'^(status\s*=\s*)"[^"]*"',
+                f'\\1"{status}"',
+                text,
+                flags=re.MULTILINE,
+            )
+            text = re.sub(
+                r'^(status_message\s*=\s*)"[^"]*"',
+                f'\\1"{status_message}"',
+                text,
+                flags=re.MULTILINE,
+            )
+            self._config_path.write_text(text)
+        except Exception as e:
+            log.warning("failed to persist status to config: %s", e)
 
     def cmd_get_presence(self) -> tuple[str, str]:
         return (

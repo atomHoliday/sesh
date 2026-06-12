@@ -149,11 +149,12 @@ export class SeshPanelButton extends PanelMenu.Button {
         const menuItem = new PopupMenu.PopupMenuItem(
           currentStatus === item.status ? `  ✓ ${item.label}` : `  ${item.label}`
         );
-        menuItem.connect('activate', () => {
+        menuItem.connect('activate', async () => {
           if (item.status === 'custom') {
             this._showCustomStatusDialog();
           } else {
-            this._dbus.setPresence(item.status, '');
+            await this._dbus.setPresence(item.status, '');
+            this._onMenuOpen();
           }
         });
         statusSection.addMenuItem(menuItem);
