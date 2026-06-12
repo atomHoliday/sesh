@@ -19,9 +19,12 @@ import { SeshPanelButton } from './panelMenu.js';
 //      GNOME 50+. The gesture is created in PanelMenu.Button._init
 //      and calls this.menu?.toggle() automatically.
 //    → PopupMenu.open() has an isEmpty() guard — returns early if menu
-//      has no children. We add a hidden placeholder in _init() so the
-//      menu is never empty on first open. _onMenuOpen() clears and
-//      rebuilds on open-state-changed.
+//      has no VISIBLE children. We add a visible placeholder item in
+//      _init() so the menu is never empty on first open. The placeholder
+//      is non-reactive so it doesn't interfere with clicks. _onMenuOpen()
+//      clears and rebuilds on open-state-changed.
+//    → IMPORTANT: The placeholder must be VISIBLE. GNOME 50's isEmpty()
+//      checks child.visible — an invisible item doesn't count.
 //    → Do NOT disable this._clickGesture — it breaks the menu.
 //    → Do NOT connect to 'clicked' — PanelMenu.Button extends
 //      St.Widget, which has no 'clicked' signal (only St.Button).

@@ -27,17 +27,22 @@ export class SeshPanelButton extends PanelMenu.Button {
     this.add_child(label);
 
     // GNOME 50 FIX: PopupMenu.open() has an isEmpty() guard that returns
-    // early if the menu has no children. We only populate items in
+    // early if the menu has no visible children. We only populate items in
     // _onMenuOpen() (via open-state-changed), creating a chicken-and-egg
     // problem: menu can never open because it's empty, and items are only
-    // added when it opens. Pre-populate with a hidden placeholder so
-    // isEmpty() returns false on the first click. _onMenuOpen() clears
-    // everything and rebuilds on open.
+    // added when it opens. Pre-populate with a placeholder so isEmpty()
+    // returns false on the first click. _onMenuOpen() clears everything
+    // and rebuilds on open.
+    //
+    // IMPORTANT: The placeholder must remain VISIBLE. GNOME 50's isEmpty()
+    // checks child.visible to count children — setting it invisible makes
+    // isEmpty() ignore it, defeating the fix. The placeholder is
+    // non-reactive so it won't interfere with clicks, and _onMenuOpen()
+    // immediately clears and rebuilds the menu on open.
     const placeholder = new PopupMenu.PopupMenuItem(' ', {
       reactive: false,
       can_focus: false,
     });
-    placeholder.actor.visible = false;
     this.menu.addMenuItem(placeholder);
 
     this.menu.connect('open-state-changed', (_menu, isOpen) => {
@@ -56,9 +61,11 @@ export class SeshPanelButton extends PanelMenu.Button {
     //
     // If the menu doesn't open on click, check these in order:
     //
-    //   1. isEmpty() guard: Does the menu have visible children?
-    //      → open() returns early if isEmpty() is true. We fix this
-    //        with a hidden placeholder item in _init().
+    //   1. isEmpty() guard: Does the menu have VISIBLE children?
+    //      → open() returns early if isEmpty() is true. GNOME 50's
+    //        isEmpty() checks child.visible — a hidden placeholder
+    //        doesn't count. We add a visible placeholder item (non-
+    //        reactive) in _init(). Do NOT set it invisible.
     //
     //   2. _clickGesture exists and is enabled?
     //      → this._clickGesture?.get_enabled?.() should be true.

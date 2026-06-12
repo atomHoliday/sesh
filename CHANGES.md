@@ -2,7 +2,7 @@
 
 ## 2026-06-12
 
-### Fixed: Menu doesn't open on click (GNOME 50)
+### Fixed: Menu doesn't open on click (GNOME 50) — second attempt
 
 **Error:** Clicking the "S" panel icon does nothing. `_clickGesture.recognize`
 fires repeatedly but `open-state-changed` never fires. Menu never appears.
@@ -22,9 +22,34 @@ We only populate menu items in `_onMenuOpen()`, which is called from the
 `open-state-changed` handler. This creates a chicken-and-egg problem: the menu
 can never open because it's empty, and items are only added when it opens.
 
-**Fix:** Pre-populate the menu in `_init()` with a hidden placeholder item so
-`isEmpty()` returns false on the first click. `_onMenuOpen()` clears everything
-and rebuilds the menu on every open, so the placeholder is immediately replaced.
+**First fix attempt (broken):** Pre-populate with a hidden placeholder item
+(`placeholder.actor.visible = false`) so `isEmpty()` returns false. This did
+NOT work because GNOME 50's `isEmpty()` checks `child.visible` — invisible
+items are not counted. The placeholder was invisible, so `isEmpty()` still
+returned true.
+
+**Second fix (this):** Keep the placeholder VISIBLE. GNOME 50's `isEmpty()`
+checks `child.visible` to count children. A visible (but non-reactive)
+placeholder makes `isEmpty()` return false. `_onMenuOpen()` immediately clears
+and rebuilds the menu on open, so the placeholder is replaced within one frame.
+
+**Key insight from GNOME 50 source (`popupMenu.js`):**
+```javascript
+function isPopupMenuItemVisible(child) {
+    if (child._delegate instanceof PopupMenuSection) {
+        if (child._delegate.isEmpty()) return false;
+    }
+    return child.visible;  // ← must be true for the item to count
+}
+
+isEmpty() {
+    const hasVisibleChildren = this.box.get_children().some(child => {
+        if (child._delegate instanceof PopupSeparatorMenuItem) return false;
+        return isPopupMenuItemVisible(child);
+    });
+    return !hasVisibleChildren;
+}
+```
 
 **Testing notes:** See `panelMenu.js` TROUBLESHOOTING NOTES for a numbered list
 of what to check if clicks still break in a future GNOME version.
