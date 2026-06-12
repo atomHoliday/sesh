@@ -22,6 +22,14 @@ const DBusIface = `
     <method name="ListConversations">
       <arg type="as" name="peer_ids" direction="out"/>
     </method>
+    <method name="SetPresence">
+      <arg type="s" name="status" direction="in"/>
+      <arg type="s" name="status_message" direction="in"/>
+    </method>
+    <method name="GetPresence">
+      <arg type="s" name="status" direction="out"/>
+      <arg type="s" name="status_message" direction="out"/>
+    </method>
     <signal name="PeerOnline">
       <arg type="(ss)"/>
     </signal>
@@ -95,6 +103,23 @@ export function makeDbusClient(callbacks) {
     )
   );
 
+  subs.push(
+    conn.signal_subscribe(
+      'com.sesh.Daemon',
+      'com.sesh.Daemon',
+      'PresenceChanged',
+      '/com/sesh/Daemon',
+      null,
+      Gio.DBusSignalFlags.NONE,
+      (_conn, _sender, _path, _iface, _signal, params) => {
+        const [status, statusMessage] = params.deepUnpack();
+        if (callbacks.onPresenceChanged) {
+          callbacks.onPresenceChanged(status, statusMessage);
+        }
+      }
+    )
+  );
+
   function destroy() {
     for (const id of subs) {
       conn.signal_unsubscribe(id);
@@ -117,6 +142,12 @@ export function makeDbusClient(callbacks) {
     },
     listConversations() {
       return callRemote(instance, 'ListConversations', []);
+    },
+    setPresence(status, statusMessage) {
+      return callRemote(instance, 'SetPresence', [status, statusMessage]);
+    },
+    getPresence() {
+      return callRemote(instance, 'GetPresence', []);
     },
     destroy,
   };

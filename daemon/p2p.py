@@ -14,6 +14,8 @@ class PeerPresence:
     public_key: bytes
     tcp_port: int
     timestamp: float
+    status: str = "online"
+    status_message: str = ""
 
 
 class PeerDiscovery:
@@ -47,6 +49,8 @@ class PeerDiscovery:
             "public_key": self._my.public_key.hex(),
             "tcp_port": self._my.tcp_port,
             "timestamp": time.time(),
+            "status": self._my.status,
+            "status_message": self._my.status_message,
         }).encode()
         self._transport.sendto(msg, (self._config["broadcast_addr"], self._config["discovery_port"]))
 
@@ -63,6 +67,8 @@ class PeerDiscovery:
                 public_key=bytes.fromhex(msg["public_key"]),
                 tcp_port=msg["tcp_port"],
                 timestamp=msg.get("timestamp", time.time()),
+                status=msg.get("status", "online"),
+                status_message=msg.get("status_message", ""),
             )
             is_new = presence.peer_id not in self._peers
             self._peers[presence.peer_id] = (presence, addr[0])

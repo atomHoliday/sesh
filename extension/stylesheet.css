@@ -48,3 +48,50 @@
 .sesh-send-btn {
   min-width: 60px;
 }
+
+.sesh-emoji-btn {
+  min-width: 30px;
+  font-size: 16px;
+}
+
+.sesh-status-btn {
+  min-width: 80px;
+}
+
+.sesh-status-section {
+  padding: 8px 12px;
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+.sesh-status-label {
+  font-weight: bold;
+  padding: 4px 0;
+}
+
+.sesh-dialog {
+  max-width: 400px;
+}
+
+.sesh-dialog-content {
+  padding: 16px;
+  spacing: 12px;
+}
+
+.sesh-dialog-label {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.sesh-dialog-entry {
+  min-width: 300px;
+}
+
+.sesh-dialog-buttons {
+  spacing: 8px;
+  homogeneous: true;
+}
+
+.sesh-dialog-cancel-btn,
+.sesh-dialog-ok-btn {
+  min-width: 80px;
+}

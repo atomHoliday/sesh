@@ -57,6 +57,18 @@ class DbusApi(dbus.service.Object):
     def ListConversations(self):
         return self._d.cmd_list_conversations()
 
+    @dbus.service.method(IFACE_NAME, in_signature="ss", out_signature="")
+    def SetPresence(self, status, status_message):
+        self._d.cmd_set_presence(status, status_message)
+
+    @dbus.service.method(IFACE_NAME, in_signature="", out_signature="ss")
+    def GetPresence(self):
+        return self._d.cmd_get_presence()
+
+    @dbus.service.signal(IFACE_NAME, signature="ss")
+    def PresenceChanged(self, status, status_message):
+        pass
+
     @dbus.service.signal(IFACE_NAME, signature="ss")
     def PeerOnline(self, peer_id, username):
         pass
@@ -94,6 +106,8 @@ class SeshDaemon:
             public_key=self._crypto.public_key_bytes(),
             tcp_port=0,
             timestamp=time.time(),
+            status=config.identity.get("status", "online"),
+            status_message=config.identity.get("status_message", ""),
         )
 
         self._my_peer_id = my_peer_id
@@ -247,6 +261,23 @@ class SeshDaemon:
 
     def cmd_list_conversations(self) -> list[str]:
         return self._store.all_conversations()
+
+    def cmd_set_presence(self, status: str, status_message: str):
+        valid_statuses = ["online", "away", "lunch", "custom"]
+        if status not in valid_statuses:
+            status = "online"
+        self._discovery._my.status = status
+        self._discovery._my.status_message = status_message
+        self._discovery.broadcast_presence()
+        if self._dbus_api:
+            self._dbus_api.PresenceChanged(status, status_message)
+        log.info("presence set to: %s (%s)", status, status_message)
+
+    def cmd_get_presence(self) -> tuple[str, str]:
+        return (
+            self._discovery._my.status,
+            self._discovery._my.status_message,
+        )
 
 
 def main():

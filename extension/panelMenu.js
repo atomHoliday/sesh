@@ -2,9 +2,11 @@ import GObject from 'gi://GObject';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
+import Gtk from 'gi://Gtk';
 
 export class SeshPanelButton extends PanelMenu.Button {
   static {
@@ -68,7 +70,103 @@ export class SeshPanelButton extends PanelMenu.Button {
     this.menu.addMenuItem(placeholder);
   }
 
+  _showCustomStatusDialog() {
+    const dialog = new ModalDialog({
+      styleClass: 'sesh-dialog',
+    });
+
+    const contentBox = new St.BoxLayout({
+      vertical: true,
+      style_class: 'sesh-dialog-content',
+    });
+
+    const label = new St.Label({
+      text: 'Enter custom status:',
+      style_class: 'sesh-dialog-label',
+    });
+    contentBox.add_child(label);
+
+    const entry = new St.Entry({
+      style_class: 'sesh-dialog-entry',
+      hint_text: 'What are you up to?',
+      can_focus: true,
+    });
+    contentBox.add_child(entry);
+
+    const buttonBox = new St.BoxLayout({
+      style_class: 'sesh-dialog-buttons',
+    });
+
+    const cancelBtn = new St.Button({
+      style_class: 'sesh-dialog-cancel-btn',
+      label: 'Cancel',
+    });
+    cancelBtn.connect('clicked', () => dialog.close());
+
+    const okBtn = new St.Button({
+      style_class: 'sesh-dialog-ok-btn',
+      label: 'Set',
+    });
+    okBtn.connect('clicked', () => {
+      const text = entry.text.trim();
+      this._dbus.setPresence('custom', text);
+      dialog.close();
+    });
+
+    buttonBox.add_child(cancelBtn);
+    buttonBox.add_child(okBtn);
+    contentBox.add_child(buttonBox);
+
+    dialog.contentLayout.add_child(contentBox);
+    entry.clutter_text.connect('activate', () => {
+      const text = entry.text.trim();
+      this._dbus.setPresence('custom', text);
+      dialog.close();
+    });
+
+    dialog.open(global.get_current_time());
+  }
+
   async _renderMainMenu() {
+    const statusSection = new PopupMenu.PopupMenuSection();
+    const statusHeader = new PopupMenu.PopupMenuItem('Status', {
+      reactive: false,
+      can_focus: false,
+    });
+    statusHeader.actor.style = 'font-weight: bold; padding: 4px 12px;';
+    statusSection.addMenuItem(statusHeader);
+
+    const statusItems = [
+      { label: '🟢 Online', status: 'online' },
+      { label: '🟡 Away', status: 'away' },
+      { label: '🟠 Lunch', status: 'lunch' },
+      { label: '🔴 Custom...', status: 'custom' },
+    ];
+
+    try {
+      const [currentStatus] = await this._dbus.getPresence();
+      for (const item of statusItems) {
+        const menuItem = new PopupMenu.PopupMenuItem(
+          currentStatus === item.status ? `  ✓ ${item.label}` : `  ${item.label}`
+        );
+        menuItem.connect('activate', () => {
+          if (item.status === 'custom') {
+            this._showCustomStatusDialog();
+          } else {
+            this._dbus.setPresence(item.status, '');
+          }
+        });
+        statusSection.addMenuItem(menuItem);
+      }
+    } catch (err) {
+      const item = new PopupMenu.PopupMenuItem('  Online');
+      item.actor.reactive = false;
+      statusSection.addMenuItem(item);
+    }
+
+    this.menu.addMenuItem(statusSection);
+    this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
     const onlineSection = new PopupMenu.PopupMenuSection();
     const header = new PopupMenu.PopupMenuItem('Online', {
       reactive: false,
@@ -150,6 +248,10 @@ export class SeshPanelButton extends PanelMenu.Button {
       hint_text: 'Type a message...',
       can_focus: true,
     });
+    const emojiBtn = new St.Button({
+      style_class: 'sesh-emoji-btn',
+      label: '\u{1F600}',
+    });
     const sendBtn = new St.Button({
       style_class: 'sesh-send-btn',
       label: 'Send',
@@ -166,7 +268,17 @@ export class SeshPanelButton extends PanelMenu.Button {
     sendBtn.connect('clicked', () => doSend());
     entry.clutter_text.connect('activate', () => doSend());
 
+    emojiBtn.connect('clicked', () => {
+      const emojiPicker = new Gtk.EmojiChooser();
+      emojiPicker.connect('emoji_picked', (_widget, emoji) => {
+        entry.text += emoji;
+      });
+      emojiPicker.set_relative_to(emojiBtn);
+      emojiPicker.popup();
+    });
+
     inputBox.add_child(entry);
+    inputBox.add_child(emojiBtn);
     inputBox.add_child(sendBtn);
     view.actor.add_child(inputBox);
 

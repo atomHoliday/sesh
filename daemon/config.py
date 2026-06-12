@@ -21,6 +21,8 @@ from pathlib import Path
 DEFAULT_TOML = """\
 [identity]
 username = "{username}"
+status = "online"
+status_message = ""
 
 [network]
 discovery_port = 42069
@@ -36,7 +38,11 @@ key_dir = "{key_dir}"
 """
 
 DEFAULT_CONFIG = {
-    "identity": {"username": os.environ.get("USER", "user")},
+    "identity": {
+        "username": os.environ.get("USER", "user"),
+        "status": "online",
+        "status_message": "",
+    },
     "network": {
         "discovery_port": 42069,
         "tcp_port": 0,
