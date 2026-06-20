@@ -119,6 +119,9 @@ class SeshDaemon:
         self._discovery.set_callbacks(self._on_peer_discover, self._on_peer_timeout)
         self._dbus_api = None
         self._glib_loop = None
+        self._loop = None
+        self._periodic_task = None
+        self._init_broadcast_task = None
 
     @staticmethod
     def _gen_peer_id() -> str:
@@ -126,6 +129,7 @@ class SeshDaemon:
         return "sesh_" + raw.hex()[:16]
 
     async def start(self):
+        self._loop = asyncio.get_running_loop()
         await self._discovery.run()
         actual_tcp_port = await self._messenger.start(
             self._config.network["listen_on"],
@@ -160,8 +164,8 @@ class SeshDaemon:
             await asyncio.sleep(1)
             self._discovery.broadcast_presence()
 
-        asyncio.create_task(periodic())
-        asyncio.create_task(initial_broadcast())
+        self._periodic_task = asyncio.create_task(periodic())
+        self._init_broadcast_task = asyncio.create_task(initial_broadcast())
 
         stop_future = loop.create_future()
         loop.add_signal_handler(signal.SIGINT, lambda: stop_future.cancel())
@@ -173,6 +177,15 @@ class SeshDaemon:
             pass
 
     async def stop(self):
+        for t in (self._periodic_task, self._init_broadcast_task):
+            if t:
+                t.cancel()
+                try:
+                    await t
+                except asyncio.CancelledError:
+                    pass
+        self._periodic_task = None
+        self._init_broadcast_task = None
         if self._glib_loop:
             self._glib_loop.quit()
             self._glib_loop = None
@@ -239,7 +252,7 @@ class SeshDaemon:
                 }).encode()
                 asyncio.run_coroutine_threadsafe(
                     self._messenger.send_message(ip, presence.tcp_port, payload),
-                    asyncio.get_event_loop(),
+                    self._loop,
                 )
                 self._store.store_message(
                     msg_id, peer_id, True, content, int(time.time())
@@ -280,18 +293,43 @@ class SeshDaemon:
     def _persist_status(self, status: str, status_message: str):
         try:
             text = self._config_path.read_text()
-            text = re.sub(
-                r'^(status\s*=\s*)"[^"]*"',
-                f'\\1"{status}"',
-                text,
-                flags=re.MULTILINE,
-            )
-            text = re.sub(
-                r'^(status_message\s*=\s*)"[^"]*"',
-                f'\\1"{status_message}"',
-                text,
-                flags=re.MULTILINE,
-            )
+            has_status = bool(re.search(r'^status\s*=', text, re.MULTILINE))
+            has_msg = bool(re.search(r'^status_message\s*=', text, re.MULTILINE))
+            if has_status:
+                text = re.sub(
+                    r'^(status\s*=\s*)"[^"]*"',
+                    f'\\1"{status}"',
+                    text,
+                    flags=re.MULTILINE,
+                )
+            if has_msg:
+                text = re.sub(
+                    r'^(status_message\s*=\s*)"[^"]*"',
+                    f'\\1"{status_message}"',
+                    text,
+                    flags=re.MULTILINE,
+                )
+            if not has_status and not has_msg:
+                text = re.sub(
+                    r'^(\[identity\]\s*)$',
+                    f'\\1\nstatus = "{status}"\nstatus_message = "{status_message}"',
+                    text,
+                    flags=re.MULTILINE,
+                )
+            elif not has_status:
+                text = re.sub(
+                    r'^(\[identity\])',
+                    f'status = "{status}"\n\\1',
+                    text,
+                    flags=re.MULTILINE,
+                )
+            elif not has_msg:
+                text = re.sub(
+                    r'^(status\s*=\s*"[^"]*")',
+                    f'\\1\nstatus_message = "{status_message}"',
+                    text,
+                    flags=re.MULTILINE,
+                )
             self._config_path.write_text(text)
         except Exception as e:
             log.warning("failed to persist status to config: %s", e)

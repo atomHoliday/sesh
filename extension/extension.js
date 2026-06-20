@@ -24,7 +24,7 @@ export default class SeshExtension extends Extension {
         },
       });
 
-      this._panelBtn = new SeshPanelButton(this._dbus);
+      this._panelBtn = new SeshPanelButton(this._dbus, this.path);
       Main.panel.addToStatusArea('sesh', this._panelBtn, 0, 'right');
     } catch (e) {
       // If you see "sesh enable error" in journalctl, check:

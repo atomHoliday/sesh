@@ -6,6 +6,7 @@ import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
+import Gio from 'gi://Gio';
 import Gtk from 'gi://Gtk';
 
 export class SeshPanelButton extends PanelMenu.Button {
@@ -13,7 +14,7 @@ export class SeshPanelButton extends PanelMenu.Button {
     GObject.registerClass(this);
   }
 
-  _init(dbusClient) {
+  _init(dbusClient, extensionPath) {
     super._init(0.0, 'Sesh', false);
     this._dbus = dbusClient;
     this._conversations = {};
@@ -21,12 +22,12 @@ export class SeshPanelButton extends PanelMenu.Button {
     this._chatUsername = null;
     this._menuItems = [];
 
-    const label = new St.Label({
-      text: 'S',
+    const gfile = Gio.File.new_for_path(extensionPath + '/people.svg');
+    const icon = new St.Icon({
+      gicon: Gio.FileIcon.new(gfile),
       style_class: 'system-status-icon',
-      y_align: Clutter.ActorAlign.CENTER,
     });
-    this.add_child(label);
+    this.add_child(icon);
 
     this._addPlaceholder();
 
@@ -276,7 +277,9 @@ export class SeshPanelButton extends PanelMenu.Button {
     const doSend = () => {
       const text = entry.text.trim();
       if (!text) return;
-      this._dbus.sendMessage(this._chatPeerId, text);
+      this._dbus.sendMessage(this._chatPeerId, text).catch(e =>
+        console.error('sesh: send failed', e)
+      );
       this._addMessage(messageBox, scrollView, 'You', text, true);
       entry.text = '';
     };
@@ -352,7 +355,9 @@ export class SeshPanelButton extends PanelMenu.Button {
   // If menu is open on the main list, refresh to show the new peer.
   onPeerOnline(_peerId, _username) {
     if (this.menu.isOpen && !this._chatPeerId) {
-      this._onMenuOpen();
+      this._onMenuOpen().catch(e =>
+        console.error('sesh: refresh on peer online failed', e)
+      );
     }
   }
 
@@ -365,7 +370,9 @@ export class SeshPanelButton extends PanelMenu.Button {
       this._chatUsername = null;
     }
     if (this.menu.isOpen) {
-      this._onMenuOpen();
+      this._onMenuOpen().catch(e =>
+        console.error('sesh: refresh on peer offline failed', e)
+      );
     }
   }
 
